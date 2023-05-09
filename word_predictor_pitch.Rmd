@@ -1,0 +1,53 @@
+---
+title: "Data science Capstone Project"
+author: "Michael Amakoh"
+date: "`r Sys.Date()`"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## ObJective Word predictor App
+
+the word predictotr App is an interface that predict the likely next word given a sequence of previous word,This presentation features the Word Predict app including an introduction to the application user interface and details about the its prediction algorithm.
+
+The Next Word Predict app is located at:
+
+[Word predictor app](https://7s4zce-michael-amakoh.shinyapps.io/Word_predictor_WebApp/)
+The source code files can be found on GitHub:
+
+[GITHUB](https://github.com/mykelsoftworld/Data-science-capstone-project)
+ 
+
+## Word predictor Shiny App
+
+Word Predictor is a Shiny app that uses a text prediction algorithm to predict the next word(s) based on text entered by a user.
+
+the app is built with sampled word corpus from english text corpus from news,twitter and blog post.the sampled corpus was cleaned using the tm package of in R.the text was clean for the following 
+
+* Remove URL, Twitter handles and email patterns by converting them to spaces using a custom content transformer
+* Convert all words to lowercase * Remove common English stop words * Remove punctuation marks * Remove numbers * Trim whitespace 
+* Remove profanity * Convert to plain text documents
+
+## Prediction Algorithm
+
+the prediction algorithm is base on predicting the most frequent word combination obtain from the sampled dataset,the sample dataset is splitted into unigram,bigram,trigram and quadgram,then the frequency of the each is computed,then the last word is splitted and subsequently stored in the final data set.the final data set comprise of the ngram,the frquency and then the last word which will be the predicted word for the ngram.
+
+the prediction algorithm work by searching through the n gram dataset ,and return the last word for the most frequent occuring ngram that matches the searched string,the algorithm start by extracting the last the words of the entered sentence after it is cleaned using the cleaning algorithm used by in building the text corpus dataset,
+
+
+## Application user Interface
+
+the application interface consist of side panel and a main panel,the side panel contains a text input box and a slider,the text input box is where the text you wish to predict the next word is entered while the slider is used to select how many next word suggestion u wish to get.
+the main panel consist of two tab,an about tab a summary of the App and the home tab,which have a text output session which replicate the imputed text and predicted word section which shows the predicted word returned by the word predictor model given the inputed sentence
+
+home page
+```{r}
+knitr::include_graphics("C:/Users/21214/Downloads/Word predictor home page.JPG")
+
+```
+
+
+

@@ -1,0 +1,658 @@
+---
+title: "capstone project week 2"
+author: "Michael"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Synopsis
+
+This is the Milestone Report for week 2 of the Coursera Data Science Capstone project.
+
+The objective of this report is to develop an understanding of the various statistical properties of the data set that can later be used when building the prediction model for the final data product - the Shiny application. Using exploratory data analysis, this report describes the major features of the training data and then summarizes my plans for creating the predictive model.
+
+the dataset for this project is obtained from [Capstone Dataset](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip),The model will be trained using a unified document corpus compiled from the following three sources of text data:
+
+Blogs
+News
+Twitter
+
+we shall carry out the following data analytic processes
+1. importing relevant library
+2. importing the dataset
+3. summarizing the dataset
+4. dataset preparation 
+5. data cleaning 
+6. data exploration and visualization
+
+## importing required library
+
+
+```{r include=FALSE} 
+
+if(!require("tidyverse")){
+  install.packages("tidyverse")
+  library(tidyverse)
+}
+
+if(!require("lubridate")){
+  install.packages("lubridate")                                       #helps in date formats
+  library(lubridate)
+}
+
+if(!require("ggplot2")){
+  install.packages("ggplot2")
+  library(ggplot2) 
+}                                                   #for visualizing the data
+if(!require("dplyr")){
+  install.packages("dplyr")
+}
+library(dplyr)                                      #for cleaning the data
+if(!require("tidyr"))
+{install.packages("tidyr")
+  library(tidyr) 
+}
+if(!require("caret")){
+  install.packages("caret")
+  library("caret")
+  }
+if(!require("data.table")){
+  install.packages("data.table")
+  library("data.table")
+}
+
+if(!require("tm")){
+  install.packages("tm")
+  library(tm)  
+}
+# if(!require("RWeka")){    #failed to load
+#   install.packages("RWeka")
+#   library("RWeka")
+#   }
+if(!require("R.utils")){
+  install.packages("R.utils")
+  library("R.utils")
+}
+if(!require("stringr")){
+  install.packages("stringr")
+  library("stringr")
+}
+
+if(!require("stringi")){
+  install.packages("stringi")
+  library("stringi")
+}
+
+
+if(!require("wordcloud")){
+  install.packages("wordcloud")
+  library("wordcloud")
+}
+
+
+if(!require("Matrix")){
+  install.packages("Matrix")
+  library("Matrix")
+}
+
+if(!require("lexicon")){
+  install.packages("lexicon")
+  library("lexicon")
+}
+if(!require("furrr")){
+  install.packages("furrr")
+  library("furrr")
+}
+
+if(!require("tidytext")){
+  install.packages("tidytext")
+  library("tidytext")
+}
+
+# if(!require("wordnet")){
+#   install.packages("wordnet")
+#   library("wordnet")
+# }
+
+if(!require("quanteda")){
+  install.packages("quanteda")
+  library("quanteda")
+}
+
+```
+
+## Importing the data
+
+here we import dataset required for the assignment
+
+```{r pressure, echo= FALSE}
+current_path <- "C:/Users/21214/Desktop/FoodMart/Exploratory data analysis/Data-science-capstone-project"
+folderpath <- "/Coursera-SwiftKey/final/en_US/"
+url <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+if (!(file.exists("./Coursera-SwiftKey.zip")))
+{ download.file(url = url,
+                destfile = paste(current_path, "Coursera-SwiftKey.zip", sep = "/"))}
+if (!file.exists("./Coursera-SwiftKey"))
+{unzip(zipfile  = "Coursera-SwiftKey.zip")}
+
+## read text data from dataset
+getwd()
+# blogs
+blogsFileName <- paste(current_path,folderpath,"en_US.blogs.txt",sep="")
+con <- file(blogsFileName, open = "r")
+blogs <- readLines(con, encoding = "UTF-8", skipNul = TRUE)
+close(con)
+
+# news
+newsFileName <- paste(current_path,folderpath,"en_US.news.txt",sep = "")
+con <- file(newsFileName, open = "r")
+news <- readLines(con, encoding = "UTF-8", skipNul = TRUE)
+close(con)
+
+# twitter
+twitterFileName <- paste(current_path , folderpath ,"en_US.twitter.txt",sep="")
+con <- file(twitterFileName, open = "r")
+twitter <- readLines(con, encoding = "UTF-8", skipNul = TRUE)
+close(con)
+
+```
+
+
+## generating a data frame summaary for the data
+
+A summary of the three text corpora is provided which includes file sizes, number of lines, number of characters, and number of words for each source file. Also included are basic statistics on the number of words per line (min, mean, and max).
+
+An initial investigation of the data shows that on average, each text corpora has a relatively low number of words per line. blogs tend to have more words per line, followed by news and then twitter which has the least words per line. The lower number of words per line for the Twitter data is expected given that a tweet is limited to a certain number of characters. 
+```{r }
+twitter_stat <- stri_stats_latex(twitter) # Basic twitter stats using stringi
+blogs_stat <- stri_stats_latex(blogs)     # Basic blogs stats using stringi
+news_stat <- stri_stats_latex(news)       # #Basic news stats using stringi
+
+data_summary <- data.frame("File"=c("Twitter","Blog","News"),
+                      "Size"=c(format(object.size(twitter),"MB"),format(object.size(blogs),"MB"),format(object.size(news),"MB")),
+                      "Lines"=c(as.numeric(countLines(paste0(current_path,folderpath,"en_US.twitter.txt"))),
+                                as.numeric(countLines(paste0(current_path,folderpath,"en_US.blogs.txt"))),
+                                as.numeric(countLines(paste0(current_path,folderpath,"en_US.news.txt")))),
+                      "Characters"=c(as.numeric(twitter_stat[1]),as.numeric(blogs_stat[1]),as.numeric(news_stat[1])),
+                      "WhiteSpaces"=c(as.numeric(twitter_stat[3]),as.numeric(blogs_stat[3]),as.numeric(news_stat[3])),
+                      "Words"=c(as.numeric(twitter_stat[4]),as.numeric(blogs_stat[4]),as.numeric(news_stat[4]))
+                      )
+
+print(data_summary)
+
+```
+## Data preparation
+Prior to performing exploratory data analysis, the three data sets will be sampled 15000 to improve performance. All non-English characters will be removed from the subset of data and then combined into a single data set.
+
+The next step is to create a corpus from the sampled data set. A custom function named build Corpus will be employed to perform the following transformation steps for each document:
+1. Data sampling
+2. Remove URL, Twitter handles and email patterns by converting them to spaces using a custom content transformer
+3. Convert all words to lowercase
+4. Remove common English stop words
+5. Remove punctuation marks
+6. Remove numbers
+7. Trim whitespace
+8. Remove profanity
+Convert to plain text documents
+
+### data sampling for further exploratory analysis
+```{r }
+twitter_sample <- slice_sample(data.frame(twitter),n=300000)
+blog_sample <- slice_sample(data.frame(blogs),n = 300000)
+news_sample <- slice_sample(data.frame(news),n = 300000)
+
+### convert the charater string to a dataframe
+
+
+twitter_df<-data.frame(twitter)
+blogs_df<-data.frame(blogs)
+news_df<- data.frame(news)
+
+twitter_df<-twitter_df%>%mutate(line_len=str_length(twitter_df$twitter))
+blogs_df<-blogs_df%>%mutate(line_len=str_length(blogs_df$blogs))
+news_df<-news_df%>%mutate(line_len=str_length(news_df$news))
+
+twitter_df<-twitter_df%>%mutate(word_count=str_count(twitter_df$twitter,"\\S+"))
+blogs_df<-blogs_df%>%mutate(word_count=str_count(blogs_df$blogs,"\\S+"))
+news_df<-news_df%>%mutate(word_count=str_count(news_df$news,"\\S+"))
+
+
+```
+### Histogram for words per line
+```{r echo = TRUE}
+ggplot(data=twitter_df,aes(word_count))+geom_histogram(binwidth = 1) + labs(title="WORD/LINE Twitter")
+ggplot(data=news_df,aes(word_count))+geom_histogram(binwidth = 1) + labs(title="WORD/LINE News")
+ggplot(data=blogs_df,aes(word_count))+geom_histogram(binwidth = 1) + labs(title = "WORDS/LINE Blogs")
+```
+### Data Cleaning
+
+here we create a corpus from the sampled data set. A custom function named Corpus_builder will be employed to perform the following transformation steps for each document:
+
+Remove URL, Twitter handles and email patterns by converting them to spaces using a custom content transformer
+Convert all words to lowercase
+Remove common English stop words
+Remove punctuation marks
+Remove numbers
+Trim whitespace
+Remove profanity
+Convert to plain text documents
+```{r}
+
+# Custom content transformer to remove URLs, Twitter handles, and email patterns
+myTransformer <- content_transformer(function(x) {
+  x <- gsub("(f|ht)(tp)(s?)(://)[0-9a-zA-Z\\.]*/?", "", x) # remove URLs
+  x <- gsub("@\\w+", "", x) # remove Twitter handles
+  x <- gsub("[\\w.-]+@[\\w.-]+\\.[\\w]+", "", x) # remove email patterns
+  return(x)
+})
+# Define a custom vector to remove profanity
+profane_arr_bad <- lexicon::profanity_arr_bad
+
+
+# Custom function to build the corpus
+Corpus_builder <- function(text) {
+  # Create a VCorpus object from the text
+  corpus <- VCorpus(VectorSource(text))
+  
+  # Transform the corpus
+  corpus <- tm_map(corpus, myTransformer) # remove URLs, Twitter handles, and email patterns
+  corpus <- tm_map(corpus, content_transformer(tolower)) # convert to lowercase
+  corpus <- tm_map(corpus, removeWords, stopwords("english")) # remove stop words
+  corpus <- tm_map(corpus, removePunctuation) # remove punctuation marks
+  corpus <- tm_map(corpus, removeNumbers) # remove numbers
+  corpus <- tm_map(corpus, stripWhitespace) # trim whitespace
+  corpus <- tm_map(corpus, removeWords, profane_arr_bad) # remove profanity
+  corpus <- tm_map(corpus, PlainTextDocument) # convert to plain text documents
+  
+  return(corpus)
+}
+
+## sampling 1% of the data for cleaning and analysis
+set.seed(1234) # Don't forget the reproducibility!
+
+
+
+# Apply the function to the text column using furrr::future_map_chr
+# plan(multiprocess)
+
+## build corpus from the sample data
+sampleData <- data.frame(sentence =  c(twitter_sample$twitter, blog_sample$blogs, news_sample$news))
+
+# twitter_sample_coupus<-Corpus_builder(twitter_sample$twitter)
+# blog_sample_corpus <- Corpus_builder(blog_sample$blogs)
+# news_sample_corpus <- Corpus_builder(news_sample$news)
+
+# build the corpus and write to disk (RDS)
+corpus <- Corpus_builder(sampleData)
+saveRDS(corpus, file = "./data/en_US.corpus.rds")
+
+# convert corpus to a dataframe and write lines/words to disk (text)
+corpusText <- data.frame(text = unlist(sapply(corpus, '[', "content")), stringsAsFactors = FALSE)
+con <- file("./data/en_US.corpus.txt", open = "w")
+writeLines(corpusText$text, con)
+close(con)
+
+# kable(head(corpusText$text, 10),
+#       row.names = FALSE,
+#       col.names = NULL,
+#       align = c("l"),
+#       caption = "First 10 Documents") %>% kable_styling(position = "left")
+
+# remove variables no longer needed to free up memory
+rm(sampleData)
+
+
+# # Custom function to clean text
+# Corpus_builder <- function(x) {
+#   # Remove URLs, email addresses, and Twitter handles
+#   x <- gsub("http\\S+|www\\S+|\\S+@\\S+|@[\\w\\d_]+", " ", x)
+#   # Convert to lowercase
+#   x <- tolower(x)
+#   # Remove stop words
+#   x <- removeWords(x, stopwords("english"))
+#   # Remove punctuation
+#   x <- removePunctuation(x)
+#   # Remove numbers
+#   x <- removeNumbers(x)
+#   # Trim whitespace
+#   x <- stripWhitespace(x)
+#   # Remove profanity
+#   x <- gsub("\\b(fuck|shit|ass)\\b", "", x, ignore.case = TRUE)
+#   # Convert to plain text
+#   PlainTextDocument(x)
+# }
+```
+
+##  Exploratory analysis
+
+  here we shall be exploring the data set in view of extracting insight of the qualities of our dataset that can be applied in developing a word predictive model. the predict model will be capable of generation likely next word given previous statement as reflected in swiftkey intelligent keyboard.this is achieved by the following steps
+  1. tokenizing the dataset into 2-gram and 3-gram words
+  2. selecting the most highest frequently occurring 2-grams and 3-grams word
+  3. visualising the most frequent word on the histograms
+
+```{r}
+# Tokenize twitter sample the text into 2-grams
+ngrams_2_twitter <- twitter_sample %>%
+  unnest_tokens(ngram, twitter, token = "ngrams", n = 2)
+
+# Count the frequency of each n-gram
+freq_2_twitter <- ngrams_2_twitter %>%
+  count(ngram, sort = TRUE)
+
+
+# Tokenize twitter sample the text into 3-grams
+ngrams_3_twitter <- twitter_sample %>%
+  unnest_tokens(ngram, twitter, token = "ngrams", n = 3)
+
+# Count the frequency of each n-gram
+freq_3_twitter <- ngrams_3_twitter %>%
+  count(ngram, sort = TRUE)
+
+
+# Tokenize blogs sample the text into 2-grams
+ngrams_2_blogs <- blog_sample %>%
+  unnest_tokens(ngram, blogs, token = "ngrams", n = 2)
+
+# Count the frequency of each n-gram
+freq_2_blogs <- ngrams_2_blogs %>%
+  count(ngram, sort = TRUE)
+
+# Tokenize blogs sample the text into 3-grams
+ngrams_3_blogs <- blog_sample %>%
+  unnest_tokens(ngram, blogs, token = "ngrams", n = 3)
+
+# Count the frequency of each n-gram
+freq_3_blogs <- ngrams_3_blogs %>%
+  count(ngram, sort = TRUE)
+
+
+# Tokenize news sample the text into 2-grams
+ngrams_2_news <- news_sample %>%
+  unnest_tokens(ngram, news, token = "ngrams", n = 2)
+
+# Count the frequency of each n-gram
+freq_2_news <- ngrams_2_news %>%
+  count(ngram, sort = TRUE)
+
+# Tokenize news sample the text into 3-grams
+ngrams_3_news <- news_sample %>%
+  unnest_tokens(ngram, news, token = "ngrams", n = 3)
+
+# Count the frequency of each n-gram
+freq_3_news <- ngrams_3_news %>%
+  count(ngram, sort = TRUE)
+
+#generating unigrams
+ngrams_1_sampleData <- sampleData %>%
+  unnest_tokens(ngram, sentence, token = "ngrams", n = 1)
+
+# Count the frequency of each n-gram
+freq_1_sampleData <- ngrams_1_sampleData %>%
+  count(ngram, sort = TRUE)
+saveRDS(freq_1_sampleData, file = "./data/unigram_freq.rds")
+
+
+# Tokenize sampleData sample the text into 2-grams
+ngrams_2_sampleData <- sampleData%>%
+  unnest_tokens(ngram, sentence, token = "ngrams", n = 2)
+
+# Count the frequency of each n-gram
+freq_2_sampleData <- ngrams_2_sampleData %>%
+  count(ngram, sort = TRUE)
+saveRDS(freq_2_sampleData, file = "./data/bigram_freq.rds")
+
+
+# Tokenize sampleData sample the text into 3-grams
+ngrams_3_sampleData <- sampleData%>%
+  unnest_tokens(ngram, sentence, token = "ngrams", n = 3)
+
+# Count the frequency of each n-gram
+freq_3_sampleData <- ngrams_3_sampleData %>%
+  count(ngram, sort = TRUE)
+freq_3_sampleData <-freq_3_sampleData[2:nrow(freq_3_sampleData),] #subseting the dataframe to eliminate NA observations
+saveRDS(freq_3_sampleData, file = "./data/trigram_freq.rds")
+
+
+
+# Tokenize sampleData sample the text into 4-grams
+ngrams_4_sampleData <- sampleData%>%
+  unnest_tokens(ngram, sentence, token = "ngrams", n = 4)
+
+
+# Count the frequency of each n-gram
+freq_4_sampleData <- ngrams_4_sampleData %>%
+  count(ngram, sort = TRUE)
+freq_4_sampleData <-freq_4_sampleData[2:nrow(freq_4_sampleData),] #subseting the dataframe to eliminate NA observations
+saveRDS(freq_4_sampleData, file = "./data/quadgram_freq.rds")
+
+
+# Plotting the most frequent gram frequency
+
+top_20_rel_freq_2gram_twitter <-freq_2_twitter[1:20,]
+# Plot the distribution of relative frequencies
+ggplot(top_20_rel_freq_2gram_twitter, aes(y = n,x=ngram)) +
+  geom_bar(stat = "identity",fill = "#FFA500") +
+  xlab("2 words gram") +
+  ylab("Count")+
+  labs(title="Top 20 twitter 2-words gram")+
+  theme(plot.title = element_text(size = 14, hjust = 0.5, vjust = 0.5),
+               axis.text.x = element_text(hjust = 0.5, vjust = 0.5, angle = 45),
+               axis.text.y = element_text(hjust = 0.5, vjust = 0.5))
+
+top_20_rel_freq_3gram_twitter <-freq_3_twitter[1:20,] #Excluding NA
+ggplot(top_20_rel_freq_3gram_twitter, aes(y = n,x=ngram)) +
+  geom_bar(stat = "identity",fill = "#FFA500") +
+  xlab("3 words gram") +
+  ylab("Count")+
+  labs(title="Top 20 twitter 3-words gram")+
+  theme(plot.title = element_text(size = 14, hjust = 0.5, vjust = 0.5),
+               axis.text.x = element_text(hjust = 0.5, vjust = 0.5, angle = 45),
+               axis.text.y = element_text(hjust = 0.5, vjust = 0.5))
+
+top_20_rel_freq_2gram_blog <-freq_2_blogs[1:20,]
+ggplot(top_20_rel_freq_2gram_blog, aes(y = n,x=ngram)) +
+  geom_bar(stat = "identity",fill = "#FFA500") +
+  xlab("2 words gram") +
+  ylab("Count")+
+  labs(title="Top 20 blogs 2-words gram")+
+  theme(plot.title = element_text(size = 14, hjust = 0.5, vjust = 0.5),
+               axis.text.x = element_text(hjust = 0.5, vjust = 0.5, angle = 45),
+               axis.text.y = element_text(hjust = 0.5, vjust = 0.5))
+
+top_20_rel_freq_3gram_blog <-freq_3_blogs[2:21,] #Excluding NA
+ggplot(top_20_rel_freq_3gram_blog, aes(y = n,x=ngram)) +
+  geom_bar(stat = "identity",fill = "#FFA500") +
+  xlab("3 words gram") +
+  ylab("Count")+
+  labs(title="Top 20 blogs 3-words gram")+
+  theme(plot.title = element_text(size = 14, hjust = 0.5, vjust = 0.5),
+               axis.text.x = element_text(hjust = 0.5, vjust = 0.5, angle = 45),
+               axis.text.y = element_text(hjust = 0.5, vjust = 0.5))
+
+top_20_rel_freq_2gram_news <-freq_2_news[1:20,]
+ggplot(top_20_rel_freq_2gram_news, aes(y = n,x=ngram)) +
+  geom_bar(stat = "identity",fill = "#FFA500") +
+  xlab("2 words gram") +
+  ylab("Count")+
+  labs(title="Top 20 news 2-words gram")+
+  theme(plot.title = element_text(size = 14, hjust = 0.5, vjust = 0.5),
+               axis.text.x = element_text(hjust = 0.5, vjust = 0.5, angle = 45),
+               axis.text.y = element_text(hjust = 0.5, vjust = 0.5))
+
+top_20_rel_freq_3gram_news <-freq_3_news[2:21,] #Excluding NA
+ggplot(top_20_rel_freq_3gram_news, aes(y = n,x=ngram)) +
+  geom_bar(stat = "identity",fill = "#FFA500") +
+  xlab("3 words gram") +
+  ylab("Count")+
+  labs(title="Top 20 news 3-words gram")+
+  theme(plot.title = element_text(size = 14, hjust = 0.5, vjust = 0.5),
+               axis.text.x = element_text(hjust = 0.5, vjust = 0.5, angle = 45),
+               axis.text.y = element_text(hjust = 0.5, vjust = 0.5))
+# plot for sampleData
+
+# histogram for unigram
+top_20_rel_freq_unigram_sampleData <-freq_1_sampleData[1:20,]
+# Plot the distribution of relative frequencies
+ggplot(top_20_rel_freq_unigram_sampleData, aes(y = n,x=ngram)) +
+  geom_bar(stat = "identity",fill = "#FFA500") +
+  xlab("unigram") +
+  ylab("Count")+
+  labs(title="Top 20 sampleData Unigram")+
+  theme(plot.title = element_text(size = 14, hjust = 0.5, vjust = 0.5),
+               axis.text.x = element_text(hjust = 0.5, vjust = 0.5, angle = 45),
+               axis.text.y = element_text(hjust = 0.5, vjust = 0.5))
+
+# histogram for bigram
+
+top_20_rel_freq_2gram_sampleData <-freq_2_sampleData[1:20,]
+# Plot the distribution of relative frequencies
+ggplot(top_20_rel_freq_2gram_sampleData, aes(y = n,x=ngram)) +
+  geom_bar(stat = "identity",fill = "#FFA500") +
+  xlab("2 words gram") +
+  ylab("Count")+
+  labs(title="Top 20 sampleData Bigram")+
+  theme(plot.title = element_text(size = 14, hjust = 0.5, vjust = 0.5),
+               axis.text.x = element_text(hjust = 0.5, vjust = 0.5, angle = 45),
+               axis.text.y = element_text(hjust = 0.5, vjust = 0.5))
+
+# histogram for trigram
+
+top_20_rel_freq_3gram_sampleData <-freq_3_sampleData[1:20,]
+# Plot the distribution of relative frequencies
+ggplot(top_20_rel_freq_3gram_sampleData, aes(y = n,x=ngram)) +
+  geom_bar(stat = "identity",fill = "#FFA500") +
+  xlab("3 words gram") +
+  ylab("Count")+
+  labs(title="Top 20 sampleData Trigram")+
+  theme(plot.title = element_text(size = 14, hjust = 0.5, vjust = 0.5),
+               axis.text.x = element_text(hjust = 0.5, vjust = 0.5, angle = 45),
+               axis.text.y = element_text(hjust = 0.5, vjust = 0.5))
+#Histogram of quadgram
+top_20_rel_freq_4gram_sampleData <-freq_4_sampleData[1:20,]
+# Plot the distribution of relative frequencies
+ggplot(top_20_rel_freq_4gram_sampleData, aes(y = n,x=ngram)) +
+  geom_bar(stat = "identity",fill = "#FFA500") +
+  xlab("4 words gram") +
+  ylab("Count")+
+  labs(title="Top 20 sampleData Quadgram")+
+  theme(plot.title = element_text(size = 14, hjust = 0.5, vjust = 0.5),
+               axis.text.x = element_text(hjust = 0.5, vjust = 0.5, angle = 80),
+               axis.text.y = element_text(hjust = 0.5, vjust = 0.5))
+```
+
+## word predictor model
+```{r}
+# loading tokenize frequency dataset
+frequnigram <- readRDS("./data/unigram_freq.rds")
+freq2ngram <- readRDS("./data/bigram_freq.rds")
+freq3ngram <- readRDS("./data/trigram_freq.rds")
+freq4ngram <- readRDS("./data/quadgram_freq.rds") #
+
+
+
+clean_input <- function(text) {
+  # Create a VCorpus object from the text
+  corpus <- VCorpus(VectorSource(text))
+  
+  # Transform the corpus
+  corpus <- tm_map(corpus, myTransformer) # remove URLs, Twitter handles, and email patterns
+  corpus <- tm_map(corpus, content_transformer(tolower)) # convert to lowercase
+  #corpus <- tm_map(corpus, removeWords, stopwords("english")) # remove stop words
+  corpus <- tm_map(corpus, removePunctuation) # remove punctuation marks
+  corpus <- tm_map(corpus, removeNumbers) # remove numbers
+  corpus <- tm_map(corpus, stripWhitespace) # trim whitespace
+  corpus <- tm_map(corpus, removeWords, profane_arr_bad) # remove profanity
+  corpus <- tm_map(corpus, PlainTextDocument) # convert to plain text documents
+  corpus <- data.frame(text = unlist(sapply(corpus, '[', "content")), stringsAsFactors = FALSE)$text
+  return(unlist(str_split(corpus, pattern = "\\s+")))
+}
+
+predictionModel <- function(userInput, ngrams) {
+
+    # quadgram (and higher)
+    # if (ngrams > 3) {
+    #      userInput3 <- paste(userInput[length(userInput) - 2],
+    #                          userInput[length(userInput) - 1],
+    #                          userInput[length(userInput)]," ")
+    #      dataTokens <- freq4ngram %>% filter(grepl(paste0("^",userInput3),ngram))
+    #      dataTokens <- dataTokens[1:5,]
+    #    if (nrow(dataTokens) >= 1) {
+    #      for (i in 1:5){
+    #        words <- strsplit(dataTokens$ngram, "\\s+")
+    #        last_word <- sapply(words, tail, 1)
+    #        
+    #      }
+    #        return(list(last_word,dataTokens))
+    #    }
+    #      # backoff to trigram
+    #      return(predictionModel(userInput, ngrams - 1))
+    #  }
+
+    # trigram
+    if (ngrams == 3) {
+        userInput2 <- paste(userInput[length(userInput)-1], userInput[length(userInput)],"")
+        dataTokens <- freq3ngram %>% filter(grepl(paste0("^",userInput2),ngram))
+        #dataTokens <- freq3ngram %>% filter(ngram == userInput2)
+        dataTokens <- dataTokens[1:5,]
+       if (nrow(dataTokens) >= 1) {
+         for (i in 1:5){
+           words <- strsplit(dataTokens$ngram, "\\s+")
+           last_word <- sapply(words, tail, 1)
+
+         }
+           return(last_word)
+       }
+        # backoff to bigram
+        return(predictionModel(userInput, ngrams - 1))
+    }
+
+    # bigram (and lower)
+    if (ngrams < 3) {
+        userInput1 <- paste(userInput[length(userInput)], "")
+        #dataTokens <- freq2ngram %>% filter(ngram == userInput1 )
+        dataTokens <- freq2ngram %>% filter(grepl(paste0("^",userInput1),ngram))
+        dataTokens <- dataTokens[1:5,]
+       if (nrow(dataTokens) >= 1) {
+         print("i am in bigram inner if loop")
+         for (i in 1:5){
+           words <- strsplit(dataTokens$ngram, "\\s+")
+           last_word <- sapply(words, tail, 1)
+           
+         }
+           return(last_word)
+       }
+        # backoff (1-gram not implemented for enhanced performance)
+        # return(match_predict(userInput, ngrams - 1))
+    }
+
+    # unigram: not implemented to enhance performance
+    return(NA)
+}
+
+predictNextWord <- function(input) {
+
+    input <- clean_input(input)
+
+    if (input[1] == "") {
+        output <- frequnigram[1:3,]
+    } else if (length(input) ==2) {
+        output <- predictionModel(input, ngrams = 2)
+    } else if (length(input) > 2) {
+        output <- predictionModel(input, ngrams = 3)
+    }
+    # else if (length(input) > 2) {
+    #     output <- predictionModel(input, ngrams = 4)
+    # }
+    return(output)
+   
+}
+
+```
+
+
